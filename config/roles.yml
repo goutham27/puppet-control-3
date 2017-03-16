@@ -46,26 +46,20 @@ roles:
       - {type: hosts}
       - {type: pe_agent, master: master}
 
-windows:
+  windows:
     guest: windows
     communicator: winrm
     forwarded_ports:
       - {guest: 8089, host: 8089, auto_correct: true}
-      # - {guest: 22,   host: 2222,  auto_correct: true, id: ssh}
       - {guest: 3389, host: 3389, auto_correct: true, id: rdp}
     providers:
       - type: virtualbox
-
         gui: true
-        # must disable clipboard on 4.3.16 or else deal with major corruption!
-        # https://www.virtualbox.org/manual/ch08.html#vboxmanage-modifyvm-other
         customize:
           - [modifyvm, !ruby/sym id, '--clipboard', 'disabled']
-          # - [modifyvm, !ruby/sym id, '--natdnshostresolver1', 'on']
           - [modifyvm, !ruby/sym id, '--audio', 'none']
           - [modifyvm, !ruby/sym id, '--usb', 'off']
     provisioners:
-      # necessary for boxes that don't have RDP enabled
       - {type: shell, path: './config/enable-rdp.bat'}
 
   pe-forward-console:
@@ -74,8 +68,6 @@ windows:
 
   pe-memory-tuning:
     provisioners:
-      # Upload to /tmp and then use a shell script to copy into place. This
-      # method works with remote machines.
       - type: file
         source: './config/pe-memory-tuning.yaml'
         destination: '/tmp/common.yaml'
@@ -83,8 +75,14 @@ windows:
         inline: |-
           mkdir -p /etc/puppetlabs/code/environments/production/hieradata
           if [ -e /tmp/common.yaml ]; then
-            install -m 0644 /tmp/common.yaml /etc/puppetlabs/code/environments/production/hieradata
+             install -m 0644 /tmp/common.yaml /etc/puppetlabs/code/environments/production/hieradata
           fi
+
+  el-fix-path:
+    provisioners:
+      - type: shell
+        inline: |
+          echo "export PATH=$PATH:/usr/local/bin" > /etc/profile.d/path_fix.sh
 
   el-stop-firewall:
     provisioners:
@@ -98,10 +96,4 @@ windows:
             service iptables stop
             chkconfig iptables off
           fi
-          # Some templates have firewalls configured weird. Just return success.
           exit 0
-  el-fix-path:
-    provisioners:
-      - type: shell
-        inline: |
-          echo "export PATH=$PATH:/usr/local/bin" > /etc/profile.d/path_fix.sh

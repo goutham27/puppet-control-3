@@ -1,0 +1,107 @@
+---
+roles:
+
+  base_4096mb_ram:
+    providers:
+      - type: virtualbox
+        customize:
+          - [modifyvm, !ruby/sym id, '--memory', 4096]
+
+  base_2048mb_ram:
+    providers:
+      - type: virtualbox
+        customize:
+          - [modifyvm, !ruby/sym id, '--memory', 2048]
+
+  base_1024mb_ram:
+    providers:
+      - type: virtualbox
+        customize:
+          - [modifyvm, !ruby/sym id, '--memory', 1024]
+
+  base_512mb_ram:
+    providers:
+      - type: virtualbox
+        customize:
+          - [modifyvm, !ruby/sym id, '--memory', 512]
+
+  pe-puppet-master:
+    private_networks:
+      - {auto_network: true}
+    provisioners:
+      - {type: hosts}
+      - {type: pe_bootstrap, role: !ruby/sym master}
+
+  pe-puppet-windows:
+    private_networks:
+      - {auto_network: true}
+    provisioners:
+      - {type: hosts}
+      - {type: pe_agent, master: master.devops}
+
+  pe-puppet-centos:
+    private_networks:
+      - {auto_network: true}
+    provisioners:
+      - {type: hosts}
+      - {type: pe_agent, master: master}
+
+windows:
+    guest: windows
+    communicator: winrm
+    forwarded_ports:
+      - {guest: 8089, host: 8089, auto_correct: true}
+      # - {guest: 22,   host: 2222,  auto_correct: true, id: ssh}
+      - {guest: 3389, host: 3389, auto_correct: true, id: rdp}
+    providers:
+      - type: virtualbox
+
+        gui: true
+        # must disable clipboard on 4.3.16 or else deal with major corruption!
+        # https://www.virtualbox.org/manual/ch08.html#vboxmanage-modifyvm-other
+        customize:
+          - [modifyvm, !ruby/sym id, '--clipboard', 'disabled']
+          # - [modifyvm, !ruby/sym id, '--natdnshostresolver1', 'on']
+          - [modifyvm, !ruby/sym id, '--audio', 'none']
+          - [modifyvm, !ruby/sym id, '--usb', 'off']
+    provisioners:
+      # necessary for boxes that don't have RDP enabled
+      - {type: shell, path: './config/enable-rdp.bat'}
+
+  pe-forward-console:
+    forwarded_ports:
+      - {guest: 443, host: 4443, auto_correct: true}
+
+  pe-memory-tuning:
+    provisioners:
+      # Upload to /tmp and then use a shell script to copy into place. This
+      # method works with remote machines.
+      - type: file
+        source: './config/pe-memory-tuning.yaml'
+        destination: '/tmp/common.yaml'
+      - type: shell
+        inline: |-
+          mkdir -p /etc/puppetlabs/code/environments/production/hieradata
+          if [ -e /tmp/common.yaml ]; then
+            install -m 0644 /tmp/common.yaml /etc/puppetlabs/code/environments/production/hieradata
+          fi
+
+  el-stop-firewall:
+    provisioners:
+      - type: shell
+        inline: |
+          RH_VERS=$(rpm -q --qf "%{VERSION}" $(rpm -q --whatprovides redhat-release)|grep -o '^[0-9]')
+          if [ "$RH_VERS" -gt "6" ]; then
+            systemctl stop firewalld.service
+            systemctl disable firewalld.service
+          else
+            service iptables stop
+            chkconfig iptables off
+          fi
+          # Some templates have firewalls configured weird. Just return success.
+          exit 0
+  el-fix-path:
+    provisioners:
+      - type: shell
+        inline: |
+          echo "export PATH=$PATH:/usr/local/bin" > /etc/profile.d/path_fix.sh

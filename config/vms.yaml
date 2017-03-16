@@ -1,0 +1,34 @@
+---
+ssh:
+  insert_key: false
+
+vms:
+- name: master
+  hostname: "master.devops"
+  box: centos/7
+  roles: ["pe-puppet-master", "base_4096mb_ram", "pe-forward-console", "el-stop-firewall"]
+
+- name: win2008r2
+  hostname: "win2008r2"
+  box: "opentable/win-2008r2-standard-amd64-nocm"
+  roles: ["pe-puppet-windows", "base_1024mb_ram", "windows"]
+
+- name: centos7
+  hostname: "centos7.devops"
+  box: "centos/7"
+  roles: ["pe-puppet-centos", "base_512mb_ram", "el-stop-firewall"]
+
+- name: jenkins
+  hostname: "jenkins.devops"
+  box: "centos/7"
+  roles: ["pe-puppet-centos", "base_1024mb_ram", "el-stop-firewall"]
+
+- name: octopus
+  hostname: "octopus"
+  box: "octopusdeploy/dsc-test-server"
+  roles: ["pe-puppet-windows", "base_1024mb_ram", "windows"]
+
+- name: win2012r2
+  hostname: "win2012r2"
+  box: "mwrock/Windows2012R2"
+  roles: ["pe-puppet-windows", "base_1024mb_ram", "windows"]
